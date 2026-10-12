@@ -1,0 +1,12 @@
+machine learning is the study of learning from examples.
+transformers use attention to mix information across tokens.
+causal attention sees earlier tokens but not future tokens.
+a small language model learns next token prediction.
+repeatable tests make machine learning projects easier to understand.
+linux and git help researchers build reproducible software.
+machine learning is the study of learning from examples.
+transformers use attention to mix information across tokens.
+causal attention sees earlier tokens but not future tokens.
+a small language model learns next token prediction.
+repeatable tests make machine learning projects easier to understand.
+linux and git help researchers build reproducible software.
