@@ -40,7 +40,8 @@ def train(args: argparse.Namespace) -> None:
     tokenizer = CharTokenizer.from_text(raw)
     tokens = torch.tensor(tokenizer.encode(raw), dtype=torch.long)
     splits = TextSplits.from_tokens(tokens, args.block_size, args.val_fraction)
-    config = ModelConfig(tokenizer.size, args.block_size, args.n_embed, args.n_layer, args.n_head)
+    config = ModelConfig(tokenizer.size, args.block_size, args.n_embed, args.n_layer, args.n_head,
+                         reference_ops=getattr(args, "reference_ops", False))
     model = TinyGPT(config).to(args.device)
     optimizer = (
         AdamWFromScratch(model.parameters(), lr=args.learning_rate)
@@ -92,6 +93,7 @@ def main() -> None:
     parser.add_argument("--eval-every", type=int, default=25)
     parser.add_argument("--eval-batches", type=int, default=5)
     parser.add_argument("--optimizer", choices=("torch", "manual"), default="torch")
+    parser.add_argument("--reference-ops", action="store_true", help="inspect unfused tensor-level primitives")
     args = parser.parse_args()
     train(args)
 

@@ -28,6 +28,8 @@ train/validation split, held-out cross-entropy reporting, and an optional
 AdamW optimizer implemented with explicit first- and second-moment updates.
 The high-throughput PyTorch optimizer remains the default.
 
+Optional `--reference-ops` switches linear, embedding, LayerNorm, GELU, softmax and cross entropy to transparent tensor-level implementations; default kernels remain optimized. See [the low-level primitives](docs/primitives.md).
+
 See [the code-level implementation guide](docs/implementation.md) for
 mathematics, module-by-module source references, and runnable examples.
 

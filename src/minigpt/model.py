@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 from torch.nn import functional as F
+from .primitives import (ScratchLinear, ScratchEmbedding, ScratchLayerNorm, ScratchGELU,
+                         scratch_softmax, scratch_cross_entropy)
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,7 @@ class ModelConfig:
     n_layer: int = 2
     n_head: int = 4
     dropout: float = 0.0
+    reference_ops: bool = False
 
     def __post_init__(self) -> None:
         if self.vocab_size < 2 or self.block_size < 1 or self.n_embed < 1:
@@ -30,10 +33,12 @@ class ModelConfig:
 class CausalSelfAttention(nn.Module):
     def __init__(self, config: ModelConfig):
         super().__init__()
+        self.reference_ops = config.reference_ops
+        linear = ScratchLinear if config.reference_ops else nn.Linear
         self.n_head = config.n_head
         self.head_dim = config.n_embed // config.n_head
-        self.qkv = nn.Linear(config.n_embed, 3 * config.n_embed)
-        self.proj = nn.Linear(config.n_embed, config.n_embed)
+        self.qkv = linear(config.n_embed, 3 * config.n_embed)
+        self.proj = linear(config.n_embed, config.n_embed)
         self.drop = nn.Dropout(config.dropout)
         self.register_buffer("mask", torch.tril(torch.ones(config.block_size, config.block_size, dtype=torch.bool)))
 
@@ -45,7 +50,8 @@ class CausalSelfAttention(nn.Module):
         v = v.view(batch, seq, self.n_head, self.head_dim).transpose(1, 2)
         scores = (q @ k.transpose(-2, -1)) * (self.head_dim ** -0.5)
         scores = scores.masked_fill(~self.mask[:seq, :seq], torch.finfo(scores.dtype).min)
-        weights = self.drop(F.softmax(scores, dim=-1))
+        probabilities = scratch_softmax(scores, dim=-1) if self.reference_ops else F.softmax(scores, dim=-1)
+        weights = self.drop(probabilities)
         y = (weights @ v).transpose(1, 2).contiguous().view(batch, seq, embed)
         return self.proj(y)
 
@@ -53,13 +59,16 @@ class CausalSelfAttention(nn.Module):
 class Block(nn.Module):
     def __init__(self, config: ModelConfig):
         super().__init__()
-        self.norm1 = nn.LayerNorm(config.n_embed)
+        norm = ScratchLayerNorm if config.reference_ops else nn.LayerNorm
+        linear = ScratchLinear if config.reference_ops else nn.Linear
+        activation = ScratchGELU if config.reference_ops else nn.GELU
+        self.norm1 = norm(config.n_embed)
         self.attn = CausalSelfAttention(config)
-        self.norm2 = nn.LayerNorm(config.n_embed)
+        self.norm2 = norm(config.n_embed)
         self.ffn = nn.Sequential(
-            nn.Linear(config.n_embed, config.n_embed * 4),
-            nn.GELU(),
-            nn.Linear(config.n_embed * 4, config.n_embed),
+            linear(config.n_embed, config.n_embed * 4),
+            activation(),
+            linear(config.n_embed * 4, config.n_embed),
             nn.Dropout(config.dropout),
         )
 
@@ -72,11 +81,14 @@ class TinyGPT(nn.Module):
     def __init__(self, config: ModelConfig):
         super().__init__()
         self.config = config
-        self.token_embedding = nn.Embedding(config.vocab_size, config.n_embed)
-        self.pos_embedding = nn.Embedding(config.block_size, config.n_embed)
+        embedding = ScratchEmbedding if config.reference_ops else nn.Embedding
+        norm = ScratchLayerNorm if config.reference_ops else nn.LayerNorm
+        linear = ScratchLinear if config.reference_ops else nn.Linear
+        self.token_embedding = embedding(config.vocab_size, config.n_embed)
+        self.pos_embedding = embedding(config.block_size, config.n_embed)
         self.blocks = nn.Sequential(*(Block(config) for _ in range(config.n_layer)))
-        self.norm = nn.LayerNorm(config.n_embed)
-        self.lm_head = nn.Linear(config.n_embed, config.vocab_size, bias=False)
+        self.norm = norm(config.n_embed)
+        self.lm_head = linear(config.n_embed, config.vocab_size, bias=False)
 
     def forward(self, tokens: torch.Tensor, targets: torch.Tensor | None = None):
         if tokens.ndim != 2:
@@ -91,7 +103,10 @@ class TinyGPT(nn.Module):
         if targets is not None:
             if targets.shape != tokens.shape:
                 raise ValueError("targets must have the same shape as tokens")
-            loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
+            flatten = logits.reshape(-1, logits.size(-1))
+            labels = targets.reshape(-1)
+            loss = (scratch_cross_entropy(flatten, labels) if self.config.reference_ops
+                    else F.cross_entropy(flatten, labels))
         return logits, loss
 
     @torch.no_grad()
@@ -102,7 +117,8 @@ class TinyGPT(nn.Module):
             raise ValueError("max_new_tokens>=0 and temperature>0 are required")
         for _ in range(max_new_tokens):
             logits, _ = self(tokens[:, -self.config.block_size:])
-            probs = F.softmax(logits[:, -1, :] / temperature, dim=-1)
+            scores = logits[:, -1, :] / temperature
+            probs = scratch_softmax(scores, dim=-1) if self.config.reference_ops else F.softmax(scores, dim=-1)
             next_token = torch.multinomial(probs, 1)
             tokens = torch.cat([tokens, next_token], dim=1)
         return tokens

@@ -35,3 +35,7 @@ python -m minigpt.generate --prompt "machine " --tokens 80
 ~~~
 
 The tiny bundled corpus is a smoke test, not a trustworthy benchmark. Validation loss is reported but no production-scale capability is claimed.
+
+## Low-level tensor primitives
+
+See [the explicit primitive-equations guide](primitives.md). Choose `--reference-ops` for inspectable operations; fast PyTorch kernels remain the default.
