@@ -9,17 +9,29 @@ A small **decoder-only autoregressive Transformer**, written in readable PyTorch
 ```bash
 python -m pip install -e '.[dev]'
 python -m pytest -q
-python -m minigpt.train --steps 100 --device cpu
+python -m minigpt.train --steps 100 --eval-every 25 --device cpu
 python -m minigpt.generate --prompt 'machine ' --tokens 80
 ```
 
-Use a larger clean text corpus to see better next-character modeling; train/validation splitting and meaningful evaluation are future extensions. Generation accepts only characters present in the training vocabulary.
+Use a larger clean text corpus to see better next-character modeling; train/validation splitting is implemented; larger datasets are required for meaningful evaluation. Generation accepts only characters present in the training vocabulary.
 
 ## Architecture
 
 `character IDs → token + position embedding → N × (LayerNorm, causal multi-head attention, residual, LayerNorm, MLP, residual) → LayerNorm → vocabulary logits`
 
 For a prompt of length **T**, a lower-triangular mask ensures the prediction at position *t* cannot depend on tokens at positions greater than *t*. `tests/test_model.py` directly checks this property.
+
+## Source-level implementation
+
+The code includes a vectorized next-character sampler with a non-overlapping
+train/validation split, held-out cross-entropy reporting, and an optional
+AdamW optimizer implemented with explicit first- and second-moment updates.
+The high-throughput PyTorch optimizer remains the default.
+
+Optional `--reference-ops` switches linear, embedding, LayerNorm, GELU, softmax and cross entropy to transparent tensor-level implementations; default kernels remain optimized. See [the low-level primitives](docs/primitives.md).
+
+See [the code-level implementation guide](docs/implementation.md) for
+mathematics, module-by-module source references, and runnable examples.
 
 ## Reproducibility
 
@@ -30,7 +42,7 @@ For a prompt of length **T**, a lower-triangular mask ensures the prediction at 
 
 ## Limitations and next experiments
 
-No pretrained tokenizer, distributed training, KV cache, attention flash kernels, mixed precision, instruction alignment, safety tuning, or benchmark results. Try held-out validation loss, tokenization alternatives, and scaling-law experiments before claiming model quality.
+No pretrained tokenizer, distributed training, KV cache, attention flash kernels, mixed precision, instruction alignment, safety tuning, or benchmark results. Try larger validation corpora, tokenization alternatives, and scaling-law experiments before claiming model quality.
 
 **Reference:** Vaswani et al. (2017), *Attention Is All You Need*; Radford et al. (2018), *Improving Language Understanding by Generative Pre-Training*.
 
