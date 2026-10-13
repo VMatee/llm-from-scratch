@@ -89,7 +89,7 @@ $$
 If the associated one-dimensional values are $[4,10]$, the attended value is approximately
 
 $$
-z=0.7311(4)+0.2689(10)=5.6134.
+z=0.7311(4)+0.2689(10)=5.6136.
 $$
 
 This small example is illustrative: the actual model computes many such weighted combinations in parallel using tensors.
