@@ -2,7 +2,7 @@
 
 A small **decoder-only autoregressive Transformer**, written in readable PyTorch and initialized with random weights. It implements character tokenization, positional embeddings, masked multi-head self-attention, residual blocks, next-token cross-entropy, a training loop, and stochastic generation.
 
-> **Scope:** runnable learning implementation, **not** a frontier LLM, an instruction-tuned assistant, or evidence of competitive benchmark performance. Tiny bundled text is for a smoke test only.
+> **Scope:** runnable reference implementation, **not** a frontier LLM, an instruction-tuned assistant, or evidence of competitive benchmark performance. Tiny bundled text is for a smoke test only.
 
 ## Quick start (Python 3.10+)
 
@@ -20,6 +20,19 @@ Use a larger clean text corpus to see better next-character modeling; train/vali
 `character IDs → token + position embedding → N × (LayerNorm, causal multi-head attention, residual, LayerNorm, MLP, residual) → LayerNorm → vocabulary logits`
 
 For a prompt of length **T**, a lower-triangular mask ensures the prediction at position *t* cannot depend on tokens at positions greater than *t*. `tests/test_model.py` directly checks this property.
+
+## Mathematical derivation
+
+At the center of this implementation is the causal attention operation:
+
+$
+\operatorname{Attention}(Q,K,V)
+=\operatorname{softmax}\left(\frac{QK^\top}{\sqrt{d_h}}+M\right)V.
+$
+
+The lower-triangular mask $M$ prevents future-token leakage. The complete explanation includes tensor dimensions, a worked numerical example, layer-normalization and cross-entropy derivations, manual AdamW updates, and links from every equation to its Python implementation.
+
+**[Read the full mathematical walkthrough →](docs/mathematics.md)**
 
 ## Source-level implementation
 
@@ -46,7 +59,7 @@ No pretrained tokenizer, distributed training, KV cache, attention flash kernels
 
 **Reference:** Vaswani et al. (2017), *Attention Is All You Need*; Radford et al. (2018), *Improving Language Understanding by Generative Pre-Training*.
 
-## Interactive notebook
+## Reproducible notebook
 
 Open [the step-by-step notebook](notebooks/01_walkthrough.ipynb) in Jupyter after installing this repository with `python -m pip install -e ".[dev]"`.
 
