@@ -25,10 +25,10 @@ For a prompt of length **T**, a lower-triangular mask ensures the prediction at 
 
 At the center of this implementation is the causal attention operation:
 
-$
-\operatorname{Attention}(Q,K,V)
-=\operatorname{softmax}\left(\frac{QK^\top}{\sqrt{d_h}}+M\right)V.
-$
+```math
+\mathrm{Attention}(Q,K,V)
+=\mathrm{softmax}\left(\frac{QK^\top}{\sqrt{d_h}}+M\right)V.
+```
 
 The lower-triangular mask $M$ prevents future-token leakage. The complete explanation includes tensor dimensions, a worked numerical example, layer-normalization and cross-entropy derivations, manual AdamW updates, and links from every equation to its Python implementation.
 
